@@ -1,7 +1,10 @@
 import {useCallback, useRef} from 'react'
+import {FaceDetection} from "@mediapipe/face_detection";
+import {drawRectangle, drawLandmarks} from "@mediapipe/drawing_utils";
 
 function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const handleStart = useCallback(async () => {
     try {
@@ -13,6 +16,50 @@ function App() {
         audio: false,
       })
       videoRef.current.play()
+
+      const faceDetection = new FaceDetection({locateFile: (file) => {
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`;
+        }
+      });
+      faceDetection.setOptions({
+        model: 'short',
+        minDetectionConfidence: 0.5
+      });
+      faceDetection.onResults((results) => {
+        console.log({results})
+        if (!canvasRef.current) {
+          return
+        }
+        const ctx = canvasRef.current.getContext("2d")
+        if (!ctx) {
+          return;
+        }
+        ctx.save();
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+        ctx.drawImage(results.image, 0, 0, canvasRef.current.width, canvasRef.current.height)
+        if (results.detections.length > 0) {
+          drawRectangle(
+            ctx, results.detections[0].boundingBox,
+            {color: 'blue', lineWidth: 4, fillColor: '#00000000'});
+          drawLandmarks(ctx, results.detections[0].landmarks, {
+            color: 'red',
+            radius: 5,
+          });
+        }
+        ctx.restore();
+      })
+      const handleVideoFrame = async () => {
+        try {
+          if (!videoRef.current) {
+            return
+          }
+          await faceDetection.send({image: videoRef.current})
+        } catch (err) {
+          console.error(err)
+        }
+        videoRef.current?.requestVideoFrameCallback(handleVideoFrame)
+      }
+      videoRef.current?.requestVideoFrameCallback(handleVideoFrame)
     } catch (err) {
       console.error(err)
     }
@@ -35,6 +82,7 @@ function App() {
         <button onClick={handleStop}>Stop</button>
       </div>
       <video ref={videoRef} />
+      <canvas ref={canvasRef} width="1280px" height="720px" />
     </div>
   )
 }
