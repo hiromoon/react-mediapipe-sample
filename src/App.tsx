@@ -5,6 +5,7 @@ import {drawRectangle, drawLandmarks} from "@mediapipe/drawing_utils";
 function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoFrameId = useRef<number|undefined>(undefined);
 
   const handleStart = useCallback(async () => {
     try {
@@ -26,7 +27,6 @@ function App() {
         minDetectionConfidence: 0.5
       });
       faceDetection.onResults((results) => {
-        console.log({results})
         if (!canvasRef.current) {
           return
         }
@@ -57,9 +57,9 @@ function App() {
         } catch (err) {
           console.error(err)
         }
-        videoRef.current?.requestVideoFrameCallback(handleVideoFrame)
+        videoFrameId.current = videoRef.current?.requestVideoFrameCallback(handleVideoFrame)
       }
-      videoRef.current?.requestVideoFrameCallback(handleVideoFrame)
+      videoFrameId.current = videoRef.current?.requestVideoFrameCallback(handleVideoFrame)
     } catch (err) {
       console.error(err)
     }
@@ -68,6 +68,9 @@ function App() {
   const handleStop = useCallback(() => {
     if (!videoRef.current || !videoRef.current?.srcObject) {
       return;
+    }
+    if (videoFrameId.current) {
+      videoRef.current?.cancelVideoFrameCallback(videoFrameId.current)
     }
     // @ts-ignore
     const tracks = videoRef.current.srcObject.getTracks();
